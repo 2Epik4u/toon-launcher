@@ -1,2 +1,2 @@
-PyQT5
+PyQT6
 requests

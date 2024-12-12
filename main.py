@@ -1,6 +1,6 @@
 import sys
-from PyQt5 import QtWidgets, uic
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QWidget, QLabel, QTextEdit, QLineEdit
+from PyQt6 import QtWidgets, uic
+from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QWidget, QLabel, QTextEdit, QLineEdit
 import platform
 import subprocess
 import requests
@@ -101,4 +101,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
