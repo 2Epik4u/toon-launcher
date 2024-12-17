@@ -19,13 +19,12 @@ class MainWindow(QMainWindow):
 
         if not os.path.exists('settings.json'):
             Settings = {
-                "TTCC_REGISTERED": 'False',
                 "DEBUG": 'True'
             }
             f = json.dumps(Settings)
             file = open("settings.json", "a")
             file.write(f)
-            file.close
+            file.close()
 
         # Load the UI file
         uic.loadUi('assets/tl.ui', self)
@@ -37,7 +36,13 @@ class MainWindow(QMainWindow):
         self.username = self.findChild(QComboBox, "username")
         self.password = self.findChild(QLineEdit, "password_3")
         self.saveTTR = self.findChild(QCheckBox, "checkBox_2")
-
+        # Load saved accounts
+        credentials = keyring.get_credential("toon-launcher", None)
+        if credentials is not None:
+            username = credentials.username
+            password = credentials.password
+        self.username.addItem(username)
+        self.password.setText(password)
         # Clash Widgets
         self.buttonclash = self.findChild(QPushButton, "playbuttonclash")
         self.usernameclash = self.findChild(QComboBox, "username_clash")
@@ -63,9 +68,8 @@ class MainWindow(QMainWindow):
         r = requests.post(TTR_LOGIN_API, headers=headers, data=data).json()
         GAMESERVER = r['gameserver']
         COOKIE = r['cookie']
-        if self.saveTTR == True:
-            keyring.set_password("system", "{self.passwordvalue}", "{self.passwordvalue}")
-        
+        if self.saveTTR.isChecked():
+            keyring.set_password("toon-launcher", str(self.usernamevalue), str(self.passwordvalue))
         if platform.system() == 'Windows':
             os.chdir('games/ttr')
             subprocess.run(r'./TTREngine64.exe', env=dict(os.environ, TTR_GAMESERVER=GAMESERVER, TTR_PLAYCOOKIE=COOKIE)) # TODO: check if user is x64 or x86. if x86 change executable
@@ -80,7 +84,7 @@ class MainWindow(QMainWindow):
                 "friendly": self.friendly}
         headers = {"User-Agent:" "Toonlauncher/1.0.0"
                    }
-        r = requests.post(TTCC_REGISTER_API, data=data).json()
+        r = requests.post(TTCC_REGISTER_API, data=data, headers=headers).json()
         token = r['token']
         headers = {"User-Agent": "Toonlauncher/1.0.0",
                    "Authorization": f"{token}"}
