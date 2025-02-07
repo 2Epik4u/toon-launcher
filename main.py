@@ -1,17 +1,20 @@
 import sys
 from PyQt6 import uic
-from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QLineEdit, QCheckBox, QComboBox, QMessageBox
+from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QLineEdit, QCheckBox, QComboBox, QMessageBox, QLabel
 import platform
 import subprocess
 import requests
 import os 
 import json
 import keyring
+import time
+import bz2
 
 TTR_LOGIN_API = "https://www.toontownrewritten.com/api/login?format=json"
 TTCC_LOGIN_API = "https://corporateclash.net/api/launcher/v1/login"
 TTCC_REGISTER_API = "https://corporateclash.net/api/launcher/v1/register"
-
+MIRRORS = "https://www.toontownrewritten.com/api/mirrors"
+PATCHMANIFEST = 'https://cdn.toontownrewritten.com/content/patchmanifest.txt'
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -25,6 +28,7 @@ class MainWindow(QMainWindow):
             file = open("settings.json", "a")
             file.write(f)
             file.close()
+        os.makedirs("games/ttr", exist_ok=True)
 
         # Load the UI file
         uic.loadUi('assets/tl.ui', self)
@@ -35,6 +39,7 @@ class MainWindow(QMainWindow):
         self.button = self.findChild(QPushButton, "playbutton")
         self.username = self.findChild(QComboBox, "username")
         self.password = self.findChild(QLineEdit, "password_3")
+        self.playtime = self.findChild(QLabel, "TTR_PLAYTIME")
         self.saveTTR = self.findChild(QCheckBox, "checkBox_2")
 
         # Clash Widgets
@@ -43,8 +48,9 @@ class MainWindow(QMainWindow):
         self.passwordclash = self.findChild(QLineEdit, "password_2")
         self.friendlyname = self.findChild(QLineEdit, "pcname")
         self.saveTTCC = self.findChild(QCheckBox, "checkBox")
+        self.playtimeTTCC = self.findChild(QLabel, "TTCC_PLAYTIME")
 
-        self.button.clicked.connect(self.playTTR)
+        self.button.clicked.connect(self.patchTTR)
         self.buttonclash.clicked.connect(self.playTTCC)
 
         # Load saved accounts
@@ -68,6 +74,7 @@ class MainWindow(QMainWindow):
 
 
     def playTTR(self):
+        global process
         self.usernamevalue = self.username.currentText()
         self.passwordvalue = self.password.text()
         data = {"username": self.usernamevalue,
@@ -93,7 +100,71 @@ class MainWindow(QMainWindow):
             keyring.set_password("toon-launcher-ttr", str(self.usernamevalue), str(self.passwordvalue))
         if platform.system() == 'Windows':
             os.chdir('games/ttr')
-            subprocess.Popen(r'./TTREngine64.exe', env=dict(os.environ, TTR_GAMESERVER=gameserver, TTR_PLAYCOOKIE=cookie)) # TODO: check if user is x64 or x86. if x86 change executable
+            if platform.machine().endswith("64"):
+                process = subprocess.Popen(r'./TTREngine64.exe', env=dict(os.environ, TTR_GAMESERVER=gameserver, TTR_PLAYCOOKIE=cookie))
+            else:
+                process = subprocess.Popen(r'./TTREngine.exe', env=dict(os.environ, TTR_GAMESERVER=gameserver, TTR_PLAYCOOKIE=cookie))
+        self.startTimer()
+
+
+    def patchTTR(self):
+        # TODO:
+        # this has a few issues.
+        # it needs to get the checksum from the json and match it with the link to make sure the file is valid.
+        # it needs to check if the file already exists and if it doesnt you dont need to reinstall it.
+        if platform.system() == "Windows":
+            os_type = "win64" if platform.machine().endswith("64") else "win32"
+        else:
+            os_type = sys.platform
+
+        r = requests.get(MIRRORS)
+        mirror_list = r.json()
+        mirror_link = mirror_list[0]
+        print(f"Using mirror: {mirror_link}")
+
+        request_patch = requests.get(PATCHMANIFEST)
+        patch_manifest = request_patch.json()
+
+        for key, value in patch_manifest.items():
+            if isinstance(value, dict) and "dl" in value:
+                only_os = value.get("only")
+                if only_os and os_type not in only_os:
+                    print(f"Skipping {key} as it is not for {os_type}.")
+                    continue
+
+                file_url = mirror_link + value["dl"]
+                downloaded_file_path = os.path.join("games/ttr", key + ".bz2")
+                extracted_file_path = os.path.join("games/ttr", key)
+
+                print(f"Downloading {file_url} to {downloaded_file_path}...")
+
+                response = requests.get(file_url)
+                with open(downloaded_file_path, "wb") as file:
+                    file.write(response.content)
+
+                if downloaded_file_path.endswith(".bz2"):
+                    print(f"Extracting {downloaded_file_path} to {extracted_file_path}...")
+                    try:
+                        with bz2.BZ2File(downloaded_file_path, "rb") as bz2_file:
+                            with open(extracted_file_path, "wb") as extracted_file:
+                                extracted_file.write(bz2_file.read())
+                        os.remove(downloaded_file_path)
+                    except Exception as e:
+                        print(f"Failed to extract {downloaded_file_path}: {e}")
+        self.playTTR()
+
+    def startTimer(self):
+        start = time.time()
+        print("Tracking time...")
+        end = time.time()
+        time.sleep(2)
+        if process.poll() is not None:
+            print("Task is closed. Stop tracking time")
+            print(end - start)
+
+
+
+
 
 
     def playTTCC(self):
@@ -118,6 +189,7 @@ class MainWindow(QMainWindow):
             os.chdir('games/ttcc')
             print("launcher login is successful")
             subprocess.Popen(r'./CorporateClash.exe', env=dict(os.environ, TT_GAMESERVER=GAMESERVER, TT_PLAYCOOKIE=COOKIE))
+        self.startTimer()
 
 
 
