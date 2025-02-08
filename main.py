@@ -22,6 +22,7 @@ class MainWindow(QMainWindow):
 
         if not os.path.exists('settings.json'):
             settings = {
+                # this shows your token in the command prompt, be careful!
                 "DEBUG": 'True'
             }
             f = json.dumps(settings)
@@ -111,7 +112,7 @@ class MainWindow(QMainWindow):
         # TODO:
         # this has a few issues.
         # it needs to get the checksum from the json and match it with the link to make sure the file is valid.
-        # it needs to check if the file already exists and if it doesnt you dont need to reinstall it.
+        # it also has no way of patching each file.
         if platform.system() == "Windows":
             os_type = "win64" if platform.machine().endswith("64") else "win32"
         else:
@@ -135,6 +136,10 @@ class MainWindow(QMainWindow):
                 file_url = mirror_link + value["dl"]
                 downloaded_file_path = os.path.join("games/ttr", key + ".bz2")
                 extracted_file_path = os.path.join("games/ttr", key)
+
+                if not os.path.exists(downloaded_file_path):
+                    print(f"file {downloaded_file_path} already exists!")
+                    continue
 
                 print(f"Downloading {file_url} to {downloaded_file_path}...")
 
