@@ -3,3 +3,4 @@ games
 settings.json
 .venv
 .idea
+elapsed.json

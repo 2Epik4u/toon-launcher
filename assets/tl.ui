@@ -183,7 +183,7 @@
        </rect>
       </property>
       <property name="text">
-       <string>Total Playtime:</string>
+       <string>Failed to load playtime!</string>
       </property>
      </widget>
     </widget>

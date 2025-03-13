@@ -22,11 +22,21 @@ class MainWindow(QMainWindow):
 
         if not os.path.exists('settings.json'):
             settings = {
-                # this shows your token in the command prompt, be careful!
-                "DEBUG": 'True'
+                "DEBUG": 'True',
+                "TTCC_REGISTERED": 'False',
+                "TTR_GAME_DIRECTORY": 'games/ttr',
+                "TTCC_GAME_DIRECTORY": 'games/ttcc',
             }
             f = json.dumps(settings)
             file = open("settings.json", "a")
+            file.write(f)
+            file.close()
+        if not os.path.exists("elapsed.json"):
+            elapsed = {
+                "elapsed": 0,
+            }
+            f = json.dumps(elapsed)
+            file = open("elapsed.json", "a")
             file.write(f)
             file.close()
         os.makedirs("games/ttr", exist_ok=True)
@@ -54,6 +64,21 @@ class MainWindow(QMainWindow):
         self.button.clicked.connect(self.patchTTR)
         self.buttonclash.clicked.connect(self.playTTCC)
 
+        # Load the playtime
+        with open('elapsed.json', 'r') as file:
+            data = json.load(file)
+
+        print(data["elapsed"])
+
+        hours = int(round(data["elapsed"] / 3600))
+        try:
+            self.playtime.setText("Total Playtime: {} Hours".format(hours))
+        except:
+            self.playtime.setText("Unable to get playtime!")
+
+
+
+
         # Load saved accounts
         credentialsttr = keyring.get_credential("toon-launcher-ttr", None)
         credentialsttcc = keyring.get_credential("toon-launcher-ttcc", None)
@@ -69,10 +94,6 @@ class MainWindow(QMainWindow):
             self.passwordclash.setText(password)
 
 
-    def load_settings(self):
-        with open("settings.json", 'r') as f:
-            self.settings = json.load(f)
-
 
     def playTTR(self):
         global process
@@ -82,7 +103,6 @@ class MainWindow(QMainWindow):
                 "password": self.passwordvalue}
         headers = {"Content-type": "application/x-www-form-urlencoded"}
         r = requests.post(TTR_LOGIN_API, headers=headers, data=data).json()
-        print(r)
         if r['success'] == 'true':
             gameserver = r['gameserver']
             cookie = r['cookie']
@@ -105,6 +125,8 @@ class MainWindow(QMainWindow):
                 process = subprocess.Popen(r'./TTREngine64.exe', env=dict(os.environ, TTR_GAMESERVER=gameserver, TTR_PLAYCOOKIE=cookie))
             else:
                 process = subprocess.Popen(r'./TTREngine.exe', env=dict(os.environ, TTR_GAMESERVER=gameserver, TTR_PLAYCOOKIE=cookie))
+            # TODO: BAD
+            os.chdir('../..')
         self.startTimer()
 
 
@@ -114,9 +136,12 @@ class MainWindow(QMainWindow):
         # it needs to get the checksum from the json and match it with the link to make sure the file is valid.
         # it also has no way of patching each file.
         if platform.system() == "Windows":
-            os_type = "win64" if platform.machine().endswith("64") else "win32"
+            os_type = "win64"
         else:
             os_type = sys.platform
+        if platform.machine().endswith("32"):
+            QMessageBox.critical(self, "Yipes! ", "Windows 32 Bit Systems are no longer supported!")
+            return
 
         r = requests.get(MIRRORS)
         mirror_list = r.json()
@@ -158,19 +183,28 @@ class MainWindow(QMainWindow):
                         print(f"Failed to extract {downloaded_file_path}: {e}")
         self.playTTR()
 
+
+
     def startTimer(self):
         start = time.time()
         print("Tracking time...")
+
+        while process.poll() is None:
+            time.sleep(1)
+
         end = time.time()
-        time.sleep(2)
-        if process.poll() is not None:
-            print("Task is closed. Stop tracking time")
-            print(end - start)
+        print("Task is closed. Stop tracking time")
 
+        with open("elapsed.json", "r") as elapsedfile:
+            data = json.load(elapsedfile)
+            elapsed_time_previous = data.get("elapsed", 0)
 
+        elapsed_time = end - start + elapsed_time_previous
+        print(f"Total elapsed time: {elapsed_time}")
 
-
-
+        elapsed = {"elapsed": elapsed_time}
+        with open("elapsed.json", "w") as file:
+            json.dump(elapsed, file)
 
     def playTTCC(self):
         self.username = self.usernameclash.currentText()
@@ -194,6 +228,7 @@ class MainWindow(QMainWindow):
             os.chdir('games/ttcc')
             print("launcher login is successful")
             subprocess.Popen(r'./CorporateClash.exe', env=dict(os.environ, TT_GAMESERVER=GAMESERVER, TT_PLAYCOOKIE=COOKIE))
+            os.chdir('../..')
         self.startTimer()
 
 
