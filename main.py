@@ -1,6 +1,7 @@
 import sys
 from PyQt6 import uic
 from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QLineEdit, QCheckBox, QComboBox, QMessageBox, QLabel
+from PyQt6.QtWebEngineWidgets import QWebEngineView
 import platform
 import subprocess
 import requests
@@ -52,6 +53,11 @@ class MainWindow(QMainWindow):
         self.password = self.findChild(QLineEdit, "password_3")
         self.playtime = self.findChild(QLabel, "TTR_PLAYTIME")
         self.saveTTR = self.findChild(QCheckBox, "checkBox_2")
+        self.TTRNews = self.findChild(QWebEngineView, "webEngineView")
+        # TODO make this better, get the same color as your theme and make that the background and adjust text color too
+        self.TTRNews.page().loadFinished.connect(
+            lambda: self.TTRNews.page().runJavaScript('document.body.style.backgroundColor = "#2d2d2d"'))
+
 
         # Clash Widgets
         self.buttonclash = self.findChild(QPushButton, "playbuttonclash")
@@ -68,10 +74,8 @@ class MainWindow(QMainWindow):
         with open('elapsed.json', 'r') as file:
             data = json.load(file)
 
-        print(data["elapsed"])
-
-        hours = int(round(data["elapsed"] / 3600))
         try:
+            hours = int(round(data["elapsed"] / 3600))
             self.playtime.setText("Total Playtime: {} Hours".format(hours))
         except:
             self.playtime.setText("Unable to get playtime!")
@@ -92,7 +96,6 @@ class MainWindow(QMainWindow):
             password = credentialsttr.password
             self.usernameclash.addItem(username)
             self.passwordclash.setText(password)
-
 
 
     def playTTR(self):
@@ -237,4 +240,5 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
+    window.setWindowTitle("Toon Launcher")
     sys.exit(app.exec())

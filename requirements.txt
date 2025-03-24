@@ -1,3 +1,4 @@
 PyQT6
 requests
 keyring
+PyQt6-WebEngine
