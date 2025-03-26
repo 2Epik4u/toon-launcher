@@ -10,6 +10,7 @@ import json
 import keyring
 import time
 import bz2
+import hashlib
 
 TTR_LOGIN_API = "https://www.toontownrewritten.com/api/login?format=json"
 TTCC_LOGIN_API = "https://corporateclash.net/api/launcher/v1/login"
@@ -109,8 +110,6 @@ class MainWindow(QMainWindow):
         if r['success'] == 'true':
             gameserver = r['gameserver']
             cookie = r['cookie']
-            patch_manifest = r['manifest']
-            ttr_manifest = f"https://cdn.toontownrewritten.com{patch_manifest}"
         if r['success'] == 'false':
             errorcode = r['banner']
             QMessageBox.critical(self, "Yipes! ", f"{errorcode}")
@@ -162,18 +161,20 @@ class MainWindow(QMainWindow):
                     continue
 
                 file_url = mirror_link + value["dl"]
+                hashmanifest = value["compHash"]
                 downloaded_file_path = os.path.join("games/ttr", key + ".bz2")
                 extracted_file_path = os.path.join("games/ttr", key)
 
-                if not os.path.exists(downloaded_file_path):
-                    print(f"file {downloaded_file_path} already exists!")
-                    continue
 
                 print(f"Downloading {file_url} to {downloaded_file_path}...")
 
                 response = requests.get(file_url)
                 with open(downloaded_file_path, "wb") as file:
                     file.write(response.content)
+                    print("Checking file integrity...")
+                    if not self.getHash(downloaded_file_path) == hashmanifest:
+                        QMessageBox.critical(self, "Yipes! ", f"While trying to download the file {downloaded_file_path} The hash {self.getHash(downloaded_file_path)}  does not match {hashmanifest} the file was tampered or not downloaded completely")
+                        break
 
                 if downloaded_file_path.endswith(".bz2"):
                     print(f"Extracting {downloaded_file_path} to {extracted_file_path}...")
@@ -186,7 +187,10 @@ class MainWindow(QMainWindow):
                         print(f"Failed to extract {downloaded_file_path}: {e}")
         self.playTTR()
 
-
+    def getHash(self, downloaded_file_path):
+        with open(downloaded_file_path, 'rb') as f:
+            digest = hashlib.file_digest(f, "sha1")
+            return digest.hexdigest()
 
     def startTimer(self):
         start = time.time()
