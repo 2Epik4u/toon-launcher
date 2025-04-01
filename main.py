@@ -44,7 +44,7 @@ class MainWindow(QMainWindow):
         os.makedirs("games/ttr", exist_ok=True)
 
         # Load the UI file
-        uic.loadUi('assets/tl.ui', self)
+        uic.loadUi('resources/tl.ui', self)
         
         # Define widgets
 
@@ -116,17 +116,14 @@ class MainWindow(QMainWindow):
             return
         if r['success'] == 'partial':
             resptoken = r['responseToken']
-            uic.loadUi('assets/tfa.ui', self)
+            uic.loadUi('resources/tfa.ui', self)
 
 
         if self.saveTTR.isChecked():
             keyring.set_password("toon-launcher-ttr", str(self.usernamevalue), str(self.passwordvalue))
         if platform.system() == 'Windows':
             os.chdir('games/ttr')
-            if platform.machine().endswith("64"):
-                process = subprocess.Popen(r'./TTREngine64.exe', env=dict(os.environ, TTR_GAMESERVER=gameserver, TTR_PLAYCOOKIE=cookie))
-            else:
-                process = subprocess.Popen(r'./TTREngine.exe', env=dict(os.environ, TTR_GAMESERVER=gameserver, TTR_PLAYCOOKIE=cookie))
+            process = subprocess.Popen(r'./TTREngine64.exe', env=dict(os.environ, TTR_GAMESERVER=gameserver, TTR_PLAYCOOKIE=cookie))
             # TODO: BAD
             os.chdir('../..')
         self.startTimer()
@@ -160,10 +157,18 @@ class MainWindow(QMainWindow):
                     print(f"Skipping {key} as it is not for {os_type}.")
                     continue
 
+
                 file_url = mirror_link + value["dl"]
                 hashmanifest = value["compHash"]
+                patches = value["patches"]
                 downloaded_file_path = os.path.join("games/ttr", key + ".bz2")
                 extracted_file_path = os.path.join("games/ttr", key)
+
+                if os.path.isfile(downloaded_file_path):
+                    print(f"File {downloaded_file_path} exists! Checking file hash...")
+                    if not self.getHash(downloaded_file_path) == patches:
+                        print("NO WRONG BAD")
+                    continue
 
 
                 print(f"Downloading {file_url} to {downloaded_file_path}...")
@@ -217,18 +222,30 @@ class MainWindow(QMainWindow):
         self.username = self.usernameclash.currentText()
         self.password = self.passwordclash.text()
         self.friendly = self.friendlyname.text()
+        print("init ttcc")
         data = {"username": self.username,
                 "password": self.password,
                 "friendly": self.friendly}
-        headers = {"User-Agent:" "Toonlauncher/1.0.0"
-                   }
+        headers = {"User-Agent": "Toonlauncher/1.0.0"}
         r = requests.post(TTCC_REGISTER_API, data=data, headers=headers).json()
+        print(r['status'])
+        if r['status'] == 'False':
+            errorcode = r['message']
+            QMessageBox.critical(self, "Yipes! ", f"{errorcode}")
+            return
         token = r['token']
         if self.saveTTCC.isChecked():
             keyring.set_password("toon-launcher-ttcc", str(self.username), str(self.password))
+        print("init ttcc2")
+
         headers = {"User-Agent": "Toonlauncher/1.0.0",
                    "Authorization": f"{token}"}
         rl = requests.post(TTCC_LOGIN_API, headers=headers, data=data).json()
+        if rl['error'] == 'Unauthorized':
+            errorcode = r['error']
+            QMessageBox.critical(self, "Yipes! ", f"{errorcode}")
+            return
+        print(rl)
         GAMESERVER = rl['gameserver']
         COOKIE = rl['cookie']
         if platform.system() == 'Windows':
